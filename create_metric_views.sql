@@ -1,5 +1,5 @@
--- Creates a metric view stations by hour
--- Calcualtes 3 metrics 1) Right First Time, 2) Utilisation and 3) Performance
+-- Creates metric view stations by hour
+-- Calculates 3 metrics 1) Right First Time, 2) Utilisation and 3) Performance for each hour bucket
 
 --- Creating View Split By Hour !!! note this is only managing buckets that span over one hour an not multiple hours, to be fixed later !!!
 CREATE OR REPLACE VIEW GLOBAL_PRODUCTION.TULIP_COMMON_DATA_MODEL.STATION_ACTIVITY_HISTORY_HOURLY AS
