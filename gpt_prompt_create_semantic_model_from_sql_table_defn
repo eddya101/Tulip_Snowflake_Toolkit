@@ -1,0 +1,206 @@
+Can you help me to write a YAML semantic model for a table. Here is a example:
+
+For this table defn.
+CREATE TABLE sales.public.sd_data (
+    id INT PRIMARY KEY,
+    dt DATETIME,
+    cat VARCHAR(255),
+    loc VARCHAR(255),
+    cntry VARCHAR(255),
+    chn VARCHAR(50),
+    amt DECIMAL(10, 2),
+    unts INT,
+    cst DECIMAL(10, 2)
+);
+
+Here is the semantic model
+# Name and description of the semantic model.
+name: Sales Data
+description: This semantic model can be used for asking questions over the sales data.
+
+# A semantic model can contain one or more tables.
+tables:
+
+  # A logical table on top of the 'sd_data' base table.
+  - name: sales_data
+    description: A logical table capturing daily sales information across different store locations and product categories.
+
+    # The fully qualified name of the base table.
+    base_table:
+      database: sales
+      schema: public
+      table: sd_data
+
+    # Dimension columns in the logical table.
+    dimensions:
+      - name: product_category
+        synonyms:
+          - "item_category"
+          - "product_type"
+        description: The category of the product sold.
+        expr: cat
+        data_type: NUMBER
+        unique: false
+        sample_values:
+          - "501"
+          - "544"
+
+      - name: store_country
+        description: The country where the sale took place.
+        expr: cntry
+        data_type: TEXT
+        unique: false
+        sample_values:
+          - "USA"
+          - "GBR"
+
+      - name: sales_channel
+        synonyms:
+          - "channel"
+          - "distribution_channel"
+        description: The channel through which the sale was made.
+        expr: chn
+        data_type: TEXT
+        unique: false
+        sample_values:
+          - "FB"
+          - "GOOGLE"
+
+    # Time dimension columns in the logical table.
+    time_dimensions:
+      - name: sale_timestamp
+        synonyms:
+          - "time_of_sale"
+          - "transaction_time"
+        description: The time when the sale occurred. In UTC.
+        expr: dt
+        data_type: TIMESTAMP
+        unique: false
+
+    # Measure columns in the logical table.
+    measures:
+      - name: sales_amount
+        synonyms:
+          - "revenue"
+          - "total_sales"
+        description: The total amount of money generated from the sale.
+        expr: amt
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: sales_tax
+        description: The sales tax paid for this sale.
+        expr: amt * 0.0975
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: units_sold
+        synonyms:
+          - "quantity_sold"
+          - "number_of_units"
+        description: The number of units sold in the transaction.
+        expr: unts
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: cost
+        description: The cost of the product sold.
+        expr: cst
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: profit
+        synonyms:
+          - "earnings"
+          - "net income"
+        description: The profit generated from a sale.
+        expr: amt - cst
+        data_type: NUMBER
+        default_aggregation: sum
+
+    # A table can define commonly used filters over it. These filters can then be referenced in user questions directly.
+    filters:
+      - name: north_america
+        synonyms:
+          - "North America"
+          - "N.A."
+          - "NA"
+        description: "A filter to restrict only to north american countries"
+        expr: cntry IN ('canada', 'mexico', 'usa')
+
+Please create a semantic model for this table.
+create or replace view GLOBAL_PRODUCTION.TULIP_COMMON_DATA_MODEL.STATION_HOURLY_METRICS(
+	STATION_ID,
+	HOUR_START,
+	RUNNING_TIME,
+	DOWN_TIME,
+	NON_RECORDED_TIME,
+	TARGET_QUANTITY,
+	ACTUAL_QUANTITY,
+	DEFECTS,
+	UTILISATION,
+	RIGHT_FIRST_TIME,
+	PERFORMANCE
+) as
+WITH hourly_data AS (
+    SELECT
+        STATION_ID,
+        DATE_TRUNC('HOUR', START_DATE_TIME) AS hour_start,
+        CASE WHEN Status = 'RUNNING' THEN SUM(DURATION) ELSE 0 END AS RUNNING_TIME,
+        CASE WHEN Status = 'DOWN' THEN SUM(DURATION) ELSE 0 END AS DOWN_TIME,
+        SUM(TARGET_QUANTITY) AS TARGET_QUANTITY,
+        SUM(ACTUAL_QUANTITY) AS ACTUAL_QUANTITY,
+        SUM(DEFECTS) AS DEFECTS
+    FROM
+        GLOBAL_PRODUCTION.TULIP_COMMON_DATA_MODEL.STATION_ACTIVITY_HISTORY_HOURLY
+    GROUP BY
+        STATION_ID,
+        DATE_TRUNC('HOUR', start_date_time),
+        STATUS
+),
+
+calculations AS (
+    SELECT
+        STATION_ID,
+        hour_start,
+        SUM(RUNNING_TIME) AS RUNNING_TIME,
+        SUM(DOWN_TIME) AS DOWN_TIME,
+        3600 - SUM(RUNNING_TIME + DOWN_TIME) AS Non_Recorded_Time,
+        SUM(Target_Quantity) AS Target_Quantity,
+        SUM(Actual_Quantity) AS Actual_Quantity,
+        SUM(Defects) AS Defects,
+        SUM(RUNNING_TIME) / 3600 AS Utilisation,
+        CASE 
+            WHEN SUM(Actual_Quantity) <> 0 
+            THEN (SUM(Actual_Quantity) - SUM(Defects)) / SUM(Actual_Quantity) 
+            ELSE NULL 
+        END AS Right_First_Time,
+        CASE 
+            WHEN SUM(Target_Quantity) <> 0 
+            THEN SUM(Actual_Quantity) / SUM(Target_Quantity) 
+            ELSE NULL 
+        END AS Performance
+    FROM
+        hourly_data
+    GROUP BY
+        Station_ID,
+        hour_start
+)
+
+SELECT
+    Station_ID,
+    hour_start,
+    RUNNING_TIME,
+    DOWN_TIME,
+    Non_Recorded_Time,
+    Target_Quantity,
+    Actual_Quantity,
+    Defects,
+    Utilisation,
+    Right_First_Time,
+    Performance
+FROM
+    calculations
+ORDER BY
+    Station_ID,
+    hour_start;
