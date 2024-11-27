@@ -233,6 +233,7 @@ CREATE OR REPLACE TABLE Notes_and_Comments (
 CREATE OR REPLACE TABLE Station_Activity_History (
     ID TEXT NOT NULL COMMENT 'Required unique identifier',
     Station_ID TEXT COMMENT 'Unique identifier of the station related to the record',
+    LOCATION TEXT COMMENT 'Physical Location of the station',
     Status TEXT COMMENT 'Current status of the station (e.g. Running, Down, Idle)',
     Start_Date_Time TIMESTAMP COMMENT 'Date and time that the station activity log started',
     End_Date_Time TIMESTAMP COMMENT 'Date and time that the station activity log ended',
