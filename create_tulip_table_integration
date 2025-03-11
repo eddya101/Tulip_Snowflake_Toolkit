@@ -18,3 +18,42 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION tec_tulip_access_integration
   ALLOWED_NETWORK_RULES = (tulip_instance)
   ALLOWED_AUTHENTICATION_SECRETS = (tec_tulip_co)
   ENABLED = true;
+
+--- Creating function to post to Tulip table
+CREATE OR REPLACE FUNCTION post_metric_to_tulip(HMI STRING, metric STRING, value string)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = 3.9
+HANDLER = 'post_metric'
+EXTERNAL_ACCESS_INTEGRATIONS = (tec_tulip_access_integration)
+PACKAGES = ('snowflake-snowpark-python','requests')
+SECRETS = ('secret' = tec_tulip_co )
+AS
+$$
+import _snowflake
+import requests
+import json
+import random
+import string
+import base64
+
+session = requests.Session()
+
+def post_metric(HMI, metric, value):
+  cred = _snowflake.get_username_password('secret')
+  basic_auth_value = base64.b64encode(f"{cred.username}:{cred.password}".encode('ascii')).decode('ascii')
+  basic_auth_header = f"Basic {basic_auth_value}"
+  url = "https://tec.tulip.co/api/v3/w/4KNDSQQJBidDh2c2X/tables/z3JERN8tPL3t6bTMJ/records"
+  id = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+  body = {
+        "id": id,
+        "eakva_metric": "OEE", 
+        "kklrn_value":"10"
+    }
+  response = session.post(url, json=body, headers = {"Authorization": basic_auth_header})
+  return response.json()
+
+$$;
+
+select post_metric_to_tulip('HMI', 'OEE', '10');
+
