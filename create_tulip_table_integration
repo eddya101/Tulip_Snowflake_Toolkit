@@ -19,7 +19,19 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION tec_tulip_access_integration
   ALLOWED_AUTHENTICATION_SECRETS = (tec_tulip_co)
   ENABLED = true;
 
---- Creating function to post to Tulip table
+-- create a network rule to access the Tulip instance
+
+CREATE OR REPLACE NETWORK RULE tulip_instance
+  MODE = EGRESS
+  TYPE = HOST_PORT
+  VALUE_LIST = ('tec.tulip.co');
+
+-- Create access integration
+CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION tec_tulip_access_integration
+  ALLOWED_NETWORK_RULES = (tulip_instance)
+  ALLOWED_AUTHENTICATION_SECRETS = (tec_tulip_co)
+  ENABLED = true;
+
 CREATE OR REPLACE FUNCTION post_metric_to_tulip(HMI STRING, metric STRING, value string)
 RETURNS STRING
 LANGUAGE PYTHON
@@ -48,7 +60,7 @@ def post_metric(HMI, metric, value):
   body = {
         "id": id,
         "eakva_metric": "OEE", 
-        "kklrn_value":"10"
+        "kklrn_value":value
     }
   response = session.post(url, json=body, headers = {"Authorization": basic_auth_header})
   return response.json()
@@ -56,4 +68,28 @@ def post_metric(HMI, metric, value):
 $$;
 
 select post_metric_to_tulip('HMI', 'OEE', '10');
+
+-- Creating task to write to tulip table with the OEE every X seconds
+
+create or replace task tulip_metric_write_task
+SCHEDULE = '1 MINUTES'
+USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = 'XSMALL'
+AS 
+    select post_metric_to_tulip('HMI', 'OEE', '10')
+    ;
+    
+--- Manually testing the task
+EXECUTE TASK tulip_metric_write_task;
+
+--- Now, getting the actual metric data from the table
+select post_metric_to_tulip('HMI', 'OEE', latest_oee.OEE::STRING)
+FROM (
+SELECT 
+    OEE
+FROM 
+    UNS_DATA.METRICS.HMI_METRICS_VIEW
+ORDER BY 
+    Hour_Start DESC
+LIMIT 1) AS latest_OEE;
+
 
