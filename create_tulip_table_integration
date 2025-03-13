@@ -19,18 +19,7 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION tec_tulip_access_integration
   ALLOWED_AUTHENTICATION_SECRETS = (tec_tulip_co)
   ENABLED = true;
 
--- create a network rule to access the Tulip instance
-
-CREATE OR REPLACE NETWORK RULE tulip_instance
-  MODE = EGRESS
-  TYPE = HOST_PORT
-  VALUE_LIST = ('tec.tulip.co');
-
--- Create access integration
-CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION tec_tulip_access_integration
-  ALLOWED_NETWORK_RULES = (tulip_instance)
-  ALLOWED_AUTHENTICATION_SECRETS = (tec_tulip_co)
-  ENABLED = true;
+-- Create a function to post to Tulip
 
 CREATE OR REPLACE FUNCTION post_metric_to_tulip(HMI STRING, metric STRING, value string)
 RETURNS STRING
